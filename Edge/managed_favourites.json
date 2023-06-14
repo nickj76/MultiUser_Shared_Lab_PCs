@@ -1,0 +1,27 @@
+[
+    {
+      "toplevel_name": "University of Surrey Favorites"
+    }, 
+    {
+      "url": "https://www.surrey.ac.uk", 
+      "name": "University of Surrey"
+    }, 
+    {
+      "name": "Surrey Sites", 
+      "children": [
+        {
+          "url": "https://surreylearn.surrey.ac.uk", 
+          "name": "Surrey Learn"
+        }, 
+        {
+          "url": "https://www.something.surrey.ac.uk", 
+          "name": "Surrey Site 2"
+        }
+        , 
+        {
+          "url": "https://www.something2.surrey.ac.uk", 
+          "name": "Surrey Site 3"
+        }
+      ]
+    }
+  ]
