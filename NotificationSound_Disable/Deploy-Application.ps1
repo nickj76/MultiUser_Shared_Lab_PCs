@@ -107,7 +107,7 @@ Try {
     ##* VARIABLE DECLARATION
     ##*===============================================
     ## Variables: Application
-    [String]$appVendor = ''
+    [String]$appVendor = 'UoS'
     [String]$appName = 'Notification Sound Disable'
     [String]$appVersion = '1.0'
     [String]$appArch = 'x64'
@@ -115,7 +115,7 @@ Try {
     [String]$appRevision = '01'
     [String]$appScriptVersion = '1.0.0'
     [String]$appScriptDate = '14/06/2023'
-    [String]$appScriptAuthor = ''
+    [String]$appScriptAuthor = 'Mark Ellis'
     ##*===============================================
     ## Variables: Install Titles (Only set here to override defaults set by the toolkit)
     [String]$installName = ''

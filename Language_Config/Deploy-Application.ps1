@@ -107,15 +107,15 @@ Try {
     ##* VARIABLE DECLARATION
     ##*===============================================
     ## Variables: Application
-    [String]$appVendor = 'Microsoft'
-    [String]$appName = 'Windows Power Settings'
-    [String]$appVersion = ''
-    [String]$appArch = ''
+    [String]$appVendor = 'University of Surrey'
+    [String]$appName = 'Language Configuration'
+    [String]$appVersion = '1.0'
+    [String]$appArch = 'x64'
     [String]$appLang = 'EN'
     [String]$appRevision = '01'
     [String]$appScriptVersion = '1.0.0'
-    [String]$appScriptDate = '23/02/2023'
-    [String]$appScriptAuthor = 'Nick Jenkins'
+    [String]$appScriptDate = '26/07/20XX'
+    [String]$appScriptAuthor = 'Mark Ellis'
     ##*===============================================
     ## Variables: Install Titles (Only set here to override defaults set by the toolkit)
     [String]$installName = ''
@@ -182,7 +182,8 @@ Try {
         [String]$installPhase = 'Pre-Installation'
 
         ## Show Welcome Message, close Internet Explorer if required, allow up to 3 deferrals, verify there is enough disk space to complete the install, and persist the prompt
-        ## Show-InstallationWelcome -CloseApps 'iexplore' -AllowDefer -DeferTimes 3 -CheckDiskSpace -PersistPrompt
+        # Show-InstallationWelcome -CloseApps 'iexplore' -AllowDefer -DeferTimes 3 -CheckDiskSpace -PersistPrompt
+        Show-InstallationWelcome -CloseApps 'iexplore' -CheckDiskSpace -PersistPrompt
 
         ## Show Progress Message (with the default message)
         Show-InstallationProgress
@@ -206,44 +207,45 @@ Try {
         }
 
         ## <Perform Installation tasks here>
-        ## Disable hibernation
-		$exitCode = Execute-Process -Path "$envSystem32Directory\powercfg.exe" -Parameters "/HIBERNATE OFF" -WindowStyle "Hidden" -PassThru
-		If ($exitCode.ExitCode -ne "0") {
-		    $mainExitCode = $exitCode.ExitCode
-		}
+        # Install the language pack
+        Write-Log -LogType "CMTrace" -Message "Installing en-GB language pack"
+        Install-Language en-GB
 
-		$exitCode = Execute-Process -Path "$envSystem32Directory\powercfg.exe" -Parameters "/CHANGE standby-timeout-ac 0" -WindowStyle "Hidden" -PassThru
-		If ($exitCode.ExitCode -ne "0") {
-		    $mainExitCode = $exitCode.ExitCode
-		}
+        # set the default language to en-GN
+        Write-Log -LogType "CMTrace" -Message "Setting UI preferred language to en-GB"
+        Set-SystemPreferredUILanguage en-GB
 
-        # The name of your scheduled task.
-        $taskName = "Shutdown Computer"
-        # Describe the scheduled task.
-        $description = "Shutdown computer daily at 22:00"
-        # Create a new task action
-        $taskAction = New-ScheduledTaskAction `
-            -Execute 'powershell.exe' `
-            -Argument '$result = Invoke-Command -ScriptBlock { cmd /c "quser 2>&1" | Out-Null; $LASTEXITCODE }; If ($result -ne 0) { Stop-Computer -Force }'
-        #Create task trigger
-        $taskTrigger = New-ScheduledTaskTrigger -Daily -At 10PM
-        # create a SYSTEM principle
-        $principal = New-ScheduledTaskPrincipal -UserID "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+        # remove extra languages
+        Write-Log -LogType "CMTrace" -Message "Removing language packs it-IT, nl-NL, de-DE, en-US, fr-FR"
+        Uninstall-Language it-IT
+        Uninstall-Language nl-NL
+        Uninstall-Language de-DE
+        Uninstall-Language en-US
+        Uninstall-Language fr-FR
+        Start-Sleep 120
 
-        # Register the new PowerShell scheduled task
-        # Register the scheduled task
-        Register-ScheduledTask `
-            -TaskName $taskName `
-            -Action $taskAction `
-            -Trigger $taskTrigger `
-            -Description $description `
-            -Principal $principal
+        # set the keyboard to UK, dont know if we need this
+        # Set-WinUserLanguageList -Force 'en-GB'
 
-        <# If ($EnableScheduledShutdown) {
-			$exitCode = Execute-Process -Path "$exeSchTasks" -Parameters "/Create /SC DAILY /TN "Daily Shutdown" /TR "shutdown /s /t 0" /ST 23:59" -WindowStyle "Hidden" -PassThru
-			If ($exitCode.ExitCode -ne "0") {
-			$mainExitCode = $exitCode.ExitCode
-		}#>
+        # Remove en-US from language list
+        Write-Log -LogType "CMTrace" -Message "Removing en-US from the language list"
+        # Capture the existing list
+        $langlist = Get-WinUserLanguageList
+        # Remove the default US keyboard
+        $langlist[0].InputMethodTips.Remove('0409:00000409')
+        # Add the en-GB keyboard
+        $langlist[0].InputMethodTips.Add('0809:00000809')
+        # Make it so
+        Set-WinUserLanguageList $langlist -Force
+
+        # delete reg key HKEY_USERS\.DEFAULT\Control Panel\International\User Profile System Backup\en-US
+        Remove-RegistryKey -Key "HKEY_USERS\.DEFAULT\Control Panel\International\User Profile System Backup" -Name 'en-US'
+
+        # maybe also HKEY_USERS\.DEFAULT\Control Panel\International\User Profile\en-US
+        Remove-RegistryKey -Key "HKEY_USERS\.DEFAULT\Control Panel\International\User Profile" -Name 'en-US'
+
+        # if that doesnt work
+        # delete reg value in key HKEY_USERS\.DEFAULT\Keyboard Layout\Preload that has the value 00000409
 
         ##*===============================================
         ##* POST-INSTALLATION
@@ -251,10 +253,10 @@ Try {
         [String]$installPhase = 'Post-Installation'
 
         ## <Perform Post-Installation tasks here>
-        Set-RegistryKey -Key HKEY_LOCAL_MACHINE\SOFTWARE\Intune_Installations -Name 'UoS Lab power settings' -Value '"Installed"' -Type String
+        Set-RegistryKey -Key HKEY_LOCAL_MACHINE\SOFTWARE\Intune_Installations -Name 'UoS Language Config 1.0' -Value '"Installed"' -Type String
 
         ## Display a message at the end of the install
-        If (-not $useDefaultMsi) {}
+        If (-not $useDefaultMsi) { }
     }
     ElseIf ($deploymentType -ieq 'Uninstall') {
         ##*===============================================
@@ -263,7 +265,7 @@ Try {
         [String]$installPhase = 'Pre-Uninstallation'
 
         ## Show Welcome Message, close Internet Explorer with a 60 second countdown before automatically closing
-        ## Show-InstallationWelcome -CloseApps 'iexplore' -CloseAppsCountdown 60
+        Show-InstallationWelcome -CloseApps 'iexplore' -CloseAppsCountdown 60
 
         ## Show Progress Message (with the default message)
         Show-InstallationProgress
@@ -285,9 +287,7 @@ Try {
         }
 
         ## <Perform Uninstallation tasks here>
-        if ($(Get-ScheduledTask -TaskName "Shutdown Computer" -ErrorAction SilentlyContinue).TaskName -eq "Shutdown Computer") {
-            Unregister-ScheduledTask -TaskName "Shutdown Computer" -Confirm:$False
-        }
+
 
         ##*===============================================
         ##* POST-UNINSTALLATION
@@ -295,7 +295,8 @@ Try {
         [String]$installPhase = 'Post-Uninstallation'
 
         ## <Perform Post-Uninstallation tasks here>
-        Remove-RegistryKey -Key HKEY_LOCAL_MACHINE\SOFTWARE\Intune_Installations -Name 'UoS Lab power settings'
+        Remove-RegistryKey -Key HKEY_LOCAL_MACHINE\SOFTWARE\Intune_Installations -Name 'UoS Language Config 1.0'
+
 
     }
     ElseIf ($deploymentType -ieq 'Repair') {

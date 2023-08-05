@@ -107,7 +107,7 @@ Try {
     ##* VARIABLE DECLARATION
     ##*===============================================
     ## Variables: Application
-    [String]$appVendor = ''
+    [String]$appVendor = 'University of Surrey'
     [String]$appName = 'Copy Lockscreen & Wallpaper to PC'
     [String]$appVersion = '1.0'
     [String]$appArch = ''
@@ -115,7 +115,7 @@ Try {
     [String]$appRevision = '01'
     [String]$appScriptVersion = '1.0.0'
     [String]$appScriptDate = '03/05/2023'
-    [String]$appScriptAuthor = ''
+    [String]$appScriptAuthor = 'Nick Jenkins'
     ##*===============================================
     ## Variables: Install Titles (Only set here to override defaults set by the toolkit)
     [String]$installName = ''

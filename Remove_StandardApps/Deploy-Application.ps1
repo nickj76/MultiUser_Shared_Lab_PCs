@@ -107,15 +107,15 @@ Try {
     ##* VARIABLE DECLARATION
     ##*===============================================
     ## Variables: Application
-    [String]$appVendor = 'Microsoft'
-    [String]$appName = 'Windows Power Settings'
-    [String]$appVersion = ''
-    [String]$appArch = ''
+    [String]$appVendor = 'University of Surrey'
+    [String]$appName = 'Remove Standard Windows Apps'
+    [String]$appVersion = '1.0'
+    [String]$appArch = 'x86'
     [String]$appLang = 'EN'
     [String]$appRevision = '01'
     [String]$appScriptVersion = '1.0.0'
-    [String]$appScriptDate = '23/02/2023'
-    [String]$appScriptAuthor = 'Nick Jenkins'
+    [String]$appScriptDate = '24/07/2023'
+    [String]$appScriptAuthor = 'Mark Ellis'
     ##*===============================================
     ## Variables: Install Titles (Only set here to override defaults set by the toolkit)
     [String]$installName = ''
@@ -182,7 +182,8 @@ Try {
         [String]$installPhase = 'Pre-Installation'
 
         ## Show Welcome Message, close Internet Explorer if required, allow up to 3 deferrals, verify there is enough disk space to complete the install, and persist the prompt
-        ## Show-InstallationWelcome -CloseApps 'iexplore' -AllowDefer -DeferTimes 3 -CheckDiskSpace -PersistPrompt
+        # Show-InstallationWelcome -CloseApps 'iexplore' -AllowDefer -DeferTimes 3 -CheckDiskSpace -PersistPrompt
+        Show-InstallationWelcome -CloseApps 'iexplore' -CheckDiskSpace -PersistPrompt
 
         ## Show Progress Message (with the default message)
         Show-InstallationProgress
@@ -206,44 +207,81 @@ Try {
         }
 
         ## <Perform Installation tasks here>
-        ## Disable hibernation
-		$exitCode = Execute-Process -Path "$envSystem32Directory\powercfg.exe" -Parameters "/HIBERNATE OFF" -WindowStyle "Hidden" -PassThru
-		If ($exitCode.ExitCode -ne "0") {
-		    $mainExitCode = $exitCode.ExitCode
-		}
 
-		$exitCode = Execute-Process -Path "$envSystem32Directory\powercfg.exe" -Parameters "/CHANGE standby-timeout-ac 0" -WindowStyle "Hidden" -PassThru
-		If ($exitCode.ExitCode -ne "0") {
-		    $mainExitCode = $exitCode.ExitCode
-		}
+        # List of built-in apps to remove
+        $UninstallPackages = @(
+            "Microsoft.Getstarted"
+            "Microsoft.GetHelp"
+            "Microsoft.Microsoft3DViewer"
+            "Microsoft.MicrosoftOfficeHub"
+            "Microsoft.MicrosoftSolitaireCollection"
+            "Microsoft.MixedReality.Portal"
+            "Microsoft.Office.OneNote"
+            "Microsoft.OneConnect"
+            "Microsoft.SkypeApp"
+            "Microsoft.windowscommunicationsapps"
+            "Microsoft.WindowsFeedbackHub"
+            "Microsoft.Xbox.TCUI"
+            "Microsoft.XboxApp"
+            "Microsoft.XboxGameOverlay"
+            "Microsoft.XboxGamingOverlay"
+            "Microsoft.XboxIdentityProvider"
+            "Microsoft.XboxSpeechToTextOverlay"
+            "Microsoft.YourPhone"
+            "Microsoft.ZuneMusic"
+            "Microsoft.ZuneVideo"
+            "Microsoft.BingWeather"
+            "Microsoft.MicrosoftOfficeHub"
+            "Microsoft.Office.OneNote"
+            "Microsoft.CompanyPortal"
+            "Microsoft.549981C3F5F10"
+        )
 
-        # The name of your scheduled task.
-        $taskName = "Shutdown Computer"
-        # Describe the scheduled task.
-        $description = "Shutdown computer daily at 22:00"
-        # Create a new task action
-        $taskAction = New-ScheduledTaskAction `
-            -Execute 'powershell.exe' `
-            -Argument '$result = Invoke-Command -ScriptBlock { cmd /c "quser 2>&1" | Out-Null; $LASTEXITCODE }; If ($result -ne 0) { Stop-Computer -Force }'
-        #Create task trigger
-        $taskTrigger = New-ScheduledTaskTrigger -Daily -At 10PM
-        # create a SYSTEM principle
-        $principal = New-ScheduledTaskPrincipal -UserID "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+        # List of programs to uninstall
+        $UninstallPrograms = @(
+        )
 
-        # Register the new PowerShell scheduled task
-        # Register the scheduled task
-        Register-ScheduledTask `
-            -TaskName $taskName `
-            -Action $taskAction `
-            -Trigger $taskTrigger `
-            -Description $description `
-            -Principal $principal
+        $InstalledPackages = Get-AppxPackage -AllUsers | Where {($UninstallPackages -contains $_.Name)}
 
-        <# If ($EnableScheduledShutdown) {
-			$exitCode = Execute-Process -Path "$exeSchTasks" -Parameters "/Create /SC DAILY /TN "Daily Shutdown" /TR "shutdown /s /t 0" /ST 23:59" -WindowStyle "Hidden" -PassThru
-			If ($exitCode.ExitCode -ne "0") {
-			$mainExitCode = $exitCode.ExitCode
-		}#>
+        $ProvisionedPackages = Get-AppxProvisionedPackage -Online | Where {($UninstallPackages -contains $_.DisplayName)}
+
+        $InstalledPrograms = Get-Package | Where {$UninstallPrograms -contains $_.Name}
+
+        # Remove provisioned packages first
+        ForEach ($ProvPackage in $ProvisionedPackages) {
+
+            Write-Log -LogType "CMTrace" -Message "Attempting to remove provisioned package: [$($ProvPackage.DisplayName)]..."
+
+            Try {
+                $Null = Remove-AppxProvisionedPackage -PackageName $ProvPackage.PackageName -Online -ErrorAction Stop
+                Write-Log -LogType "CMTrace" -Message "Successfully removed provisioned package: [$($ProvPackage.DisplayName)]"
+            }
+            Catch { Write-Log -Severity 2 -LogType "CMTrace" -Message "Failed to remove provisioned package: [$($ProvPackage.DisplayName)]"}
+        }
+
+        # Remove appx packages
+        ForEach ($AppxPackage in $InstalledPackages) {
+                                            
+            Write-Log -LogType "CMTrace" -Message "Attempting to remove Appx package: [$($AppxPackage.Name)]..."
+
+            Try {
+                $Null = Remove-AppxPackage -Package $AppxPackage.PackageFullName -AllUsers -ErrorAction Stop
+                Write-Log -LogType "CMTrace" -Message "Successfully removed Appx package: [$($AppxPackage.Name)]"
+            }
+            Catch {Write-Log -LogType "CMTrace" -Severity 2 -Message "Failed to remove Appx package: [$($AppxPackage.Name)]"}
+        }
+
+        # Remove installed programs
+        $InstalledPrograms | ForEach {
+
+            Write-Log -LogType "CMTrace" -Message "Attempting to uninstall: [$($_.Name)]..."
+
+            Try {
+                $Null = $_ | Uninstall-Package -AllVersions -Force -ErrorAction Stop
+                Write-Log -LogType "CMTrace" -Message "Successfully uninstalled: [$($_.Name)]"
+            }
+            Catch {Write-Log -LogType "CMTrace" -Severity 2 -Message "Failed to uninstall: [$($_.Name)]"}
+        }
 
         ##*===============================================
         ##* POST-INSTALLATION
@@ -251,10 +289,10 @@ Try {
         [String]$installPhase = 'Post-Installation'
 
         ## <Perform Post-Installation tasks here>
-        Set-RegistryKey -Key HKEY_LOCAL_MACHINE\SOFTWARE\Intune_Installations -Name 'UoS Lab power settings' -Value '"Installed"' -Type String
+        Set-RegistryKey -Key HKEY_LOCAL_MACHINE\SOFTWARE\Intune_Installations -Name 'UoS Remove Standard Windows Apps 1.0' -Value '"Installed"'-Type String
 
         ## Display a message at the end of the install
-        If (-not $useDefaultMsi) {}
+        If (-not $useDefaultMsi) { }
     }
     ElseIf ($deploymentType -ieq 'Uninstall') {
         ##*===============================================
@@ -263,7 +301,7 @@ Try {
         [String]$installPhase = 'Pre-Uninstallation'
 
         ## Show Welcome Message, close Internet Explorer with a 60 second countdown before automatically closing
-        ## Show-InstallationWelcome -CloseApps 'iexplore' -CloseAppsCountdown 60
+        Show-InstallationWelcome -CloseApps 'iexplore' -CloseAppsCountdown 60
 
         ## Show Progress Message (with the default message)
         Show-InstallationProgress
@@ -285,9 +323,7 @@ Try {
         }
 
         ## <Perform Uninstallation tasks here>
-        if ($(Get-ScheduledTask -TaskName "Shutdown Computer" -ErrorAction SilentlyContinue).TaskName -eq "Shutdown Computer") {
-            Unregister-ScheduledTask -TaskName "Shutdown Computer" -Confirm:$False
-        }
+
 
         ##*===============================================
         ##* POST-UNINSTALLATION
@@ -295,7 +331,7 @@ Try {
         [String]$installPhase = 'Post-Uninstallation'
 
         ## <Perform Post-Uninstallation tasks here>
-        Remove-RegistryKey -Key HKEY_LOCAL_MACHINE\SOFTWARE\Intune_Installations -Name 'UoS Lab power settings'
+        Remove-RegistryKey -Key HKEY_LOCAL_MACHINE\SOFTWARE\Intune_Installations -Name 'UoS Remove Standard Windows Apps 1.0'
 
     }
     ElseIf ($deploymentType -ieq 'Repair') {
